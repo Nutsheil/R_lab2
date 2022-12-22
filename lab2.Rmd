@@ -1,0 +1,114 @@
+---
+title: "Лабораторная работа №2"
+author: "Редченко Евгений"
+date: "2022-12-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***
+## Задание 8##
+
+Используйте файл RH_T.csv Найдите самую жаркую неделю 2020 года в Екатеринбурге (Средняя температура в течение недели максимальна. Неполные недели в начале и в конце года не считаем).
+
+***
+Используемые пакеты:
+```{r warning=FALSE}
+library(dplyr)
+```
+
+***
+Считываем данные:
+```{r warning=FALSE}
+setwd("C:\\Users\\Evgeniy\\Desktop\\study\\R\\lab-2")
+df <- read.csv(file = "data\\RH_T.csv")
+```
+
+***
+Функция получает на вход необработанную таблицу с данными о погоде в Екатеренбурге за 2020 год. Исключаем из таблицы строки, неполных недель (первые и последнии дни года, отвечающие за неполные недели), затем добавляем каждой строке свой номер недели, после чего группируем по неделям и считаем среднее значение температуры. Находим самую "огненную" неделю и создаем новый датафрйм, куда помещаем значения этой самой недели из старого датафрейма (дату, номер недели и температуру
+```{r warning=FALSE}
+func <- function(df){
+  first_date <- as.Date(c("06.01.2020"), "%d.%m.%Y")
+  last_date <- as.Date(c("27.12.2020"), "%d.%m.%Y")
+  
+  dates = as.Date(df$YYYYMMDD, "%Y-%m-%d")
+  df <- filter(df, dates >= first_date & dates <= last_date)
+  df <- mutate(df, WOY=((df$DOY + (7-6)) %/% 7))
+  
+  omg <- data.frame(df %>% group_by(WOY) %>%  summarise(ATOW=mean(T2M)))
+  omg <- filter(omg, ATOW == max(ATOW))
+  
+  res <- data.frame(df$YYYYMMDD, df$WOY, df$T2M)
+  res <- rename_with(res, ~ gsub("df.", "", .x, fixed = TRUE))
+  res <- filter(res, WOY==omg[1,'WOY'])
+  
+  return (res)
+}
+```
+
+***
+Запускаем нашу функцию и выводим результат
+```{r}
+res <- func(df)
+res
+```
+
+***
+## Задание 20 ##
+
+Используйте файл Payment_and_value_of_Care-Hospital.csv Напишите функцию, которая на вход принимает название Штата, название медицинской процедуры/заболевания и максимальную сумму которую пациент готов потратить на лечение ( в долларах). На выход функция должна выдавать список, в котором указаны название больницы, город и адрес больницы и диапазон стоимости необходимой услуги. Список должен быть упорядочен по возрастанию среднего значения стоимости услуги. Если на данную сумму невозможно получить данную услугу, то функция должна выдать сообщение, в котором указана минимальная стоимость услуги в штате.
+
+***
+Используемые пакеты:
+```{r warning=FALSE}
+library(readr)
+library(dplyr)
+```
+
+***
+Считываем данные:
+```{r warning=FALSE}
+setwd("C:\\Users\\Evgeniy\\Desktop\\study\\R\\lab-2")
+df <- read_csv(file = "data\\Payment_and_Value_of_Care-Hospital.csv")
+```
+
+***
+Функция получает на вход необработанную таблицу с данными о больницах в самой толлерантной стране на планете, а так же название Штата, название заболевания и максимальную сумму которую пациент готов потратить на лечение. Фильтруем таблицу по штату и болезни. Затем создаем резервную копию отфильрованной таблицы на всякий случай. Фильтркем по прайсу и проверяем остались ли строки в таблице. Если строк нет, то возвращаем минимальную стоимость процедуры. Если строки есть, то сортируем таблицу в порядке возрастания средней стоимости услуги. После чего создаем новый датафрейм, где будет название больницы, город и адрес больницы и диапазон стоимости необходимой услуги. Делаем косметическое преобразование и возвращаем новый датафрейм
+```{r warning=FALSE}
+func <- function(df, state_name, procedure, max_money){
+  df <- filter(df, df$'State' == state_name)
+  df <- filter(df, df$'Payment Measure Name' == paste("Payment for", procedure, "patients"))
+  
+  money <- as.numeric(gsub("$", "", gsub(",", "", df$'Higher Estimate'), fixed = TRUE))
+  reserv <- df
+  df <- filter(df, money <= max_money)
+  if(dim(df)[1] == 0)
+    return (paste("You need - ", min(reserv$'Payment')))
+  
+  lower_estimate <- as.numeric(gsub("$", "", gsub(",", "", df$'Lower Estimate'), fixed = TRUE))
+  higher_estimate <- as.numeric(gsub("$", "", gsub(",", "", df$'Higher Estimate'), fixed = TRUE))
+  df <- arrange(df, (lower_estimate + higher_estimate)/2)
+  
+  res <- data.frame(df$'Facility Name',
+                    df$'City',
+                    df$'Address',
+                    df$'Lower Estimate',
+                    df$'Higher Estimate')
+  
+  res <- rename_with(res, ~ gsub(".", " ", .x, fixed = TRUE))
+  res <- rename_with(res, ~ gsub("df", "", .x, fixed = TRUE))
+  
+  return(res)
+}
+
+```
+
+***
+Возьмем штат "AL" болезнь "pneumonia" и максимальный прайс в 20к зеленых
+```{r}
+res <- func(df, "AL", "pneumonia", 20000)
+res
+```
